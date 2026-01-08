@@ -4,11 +4,13 @@ Manages system status checks and model connection tests
 """
 
 from datetime import datetime
+import os
 import re
 import time
 
 from fastapi import APIRouter
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from src.core.core import get_embedding_config, get_llm_config, get_tts_config
@@ -206,6 +208,10 @@ async def test_embeddings_connection():
         embedding_config = get_embedding_config()
         model = embedding_config["model"]
         base_url = embedding_config["base_url"].rstrip("/")
+        
+        # Get timeout from environment (default to 600 seconds for embeddings)
+        # Falls back to LLM_TIMEOUT if EMBEDDING_TIMEOUT not set
+        timeout = int(os.getenv("EMBEDDING_TIMEOUT", os.getenv("LLM_TIMEOUT", "600")))
 
         # Sanitize Base URL (remove /embeddings suffix if present, though less common)
         # OpenAI client handles /embeddings automatically
@@ -217,10 +223,30 @@ async def test_embeddings_connection():
 
         # Send a minimal test request
         test_texts = ["test"]
-        # openai_embed returns a coroutine, so we need to await it
-        embeddings = await openai_embed(
-            texts=test_texts, model=model, api_key=api_key, base_url=base_url
-        )
+        
+        # For NVIDIA models, we need to use OpenAI client directly to pass extra_body
+        # because lightrag's openai_embed wrapper doesn't support it
+        if "nvidia" in base_url.lower() or "nvidia" in model.lower():
+            # Use OpenAI client directly for NVIDIA models
+            client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+            response = await client.embeddings.create(
+                input=test_texts,
+                model=model,
+                extra_body={
+                    "input_type": "query",  # Required for NVIDIA asymmetric models
+                    "truncate": "NONE"
+                }
+            )
+            embeddings = [response.data[0].embedding]
+        else:
+            # Use lightrag's wrapper for standard OpenAI-compatible endpoints
+            embeddings = await openai_embed(
+                texts=test_texts, 
+                model=model, 
+                api_key=api_key, 
+                base_url=base_url, 
+                client_configs={"timeout": timeout}
+            )
 
         response_time = (time.time() - start_time) * 1000
 
