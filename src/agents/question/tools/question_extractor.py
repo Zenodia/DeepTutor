@@ -93,7 +93,16 @@ def extract_questions_with_llm(
             "images": [List of relative paths to related images]
         }
     """
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    # Get timeout from environment (default to 600 seconds for NVIDIA API)
+    import os
+    timeout = int(os.getenv("LLM_TIMEOUT", "600"))
+    
+    client = OpenAI(
+        api_key=api_key, 
+        base_url=base_url,
+        timeout=timeout,
+        max_retries=3
+    )
 
     image_list = []
     if images_dir.exists():

@@ -58,10 +58,14 @@ def get_llm_config() -> dict:
             - model: LLM model name
             - api_key: LLM API key
             - base_url: LLM API endpoint URL
+            - timeout: Request timeout in seconds (optional)
 
     Raises:
         ValueError: If required configuration is missing
     """
+    # Get timeout from environment (default to 600 seconds = 10 minutes for NVIDIA API)
+    timeout = _to_int(_strip_value(os.getenv("LLM_TIMEOUT")), 600)
+    
     # 1. Try to get active provider from new system
     try:
         from src.core.llm_provider import provider_manager
@@ -75,6 +79,7 @@ def get_llm_config() -> dict:
                 "model": active_provider.model,
                 "api_key": active_provider.api_key,
                 "base_url": active_provider.base_url,
+                "timeout": timeout,
             }
     except Exception as e:
         print(f"⚠️ Failed to load active provider: {e}")
@@ -108,6 +113,7 @@ def get_llm_config() -> dict:
         "model": model,
         "api_key": api_key,
         "base_url": base_url,
+        "timeout": timeout,
     }
 
 

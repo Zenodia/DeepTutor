@@ -171,6 +171,7 @@ class BaseAgent(ABC):
         model = model or self.get_model()
         temperature = temperature if temperature is not None else self.get_temperature()
         max_tokens = self.get_max_tokens()
+        timeout = self.llm_config.get("timeout", 60)
 
         kwargs = {
             "model": model,
@@ -179,6 +180,7 @@ class BaseAgent(ABC):
             "api_key": self.api_key,
             "base_url": self.base_url,
             "temperature": temperature,
+            "timeout": timeout,
         }
 
         if response_format:

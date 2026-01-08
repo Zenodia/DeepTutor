@@ -53,11 +53,13 @@ class BaseAgent(ABC):
             self.api_key = api_key or env_llm.get("api_key")
             self.base_url = base_url or env_llm.get("base_url")
             self.default_model = env_llm.get("model")
+            self.timeout = env_llm.get("timeout", 60)
         except ValueError as e:
             print(f"⚠️ Environment configuration error: {e}")
             self.api_key = api_key
             self.base_url = base_url
             self.default_model = "gpt-4o"
+            self.timeout = 60
 
         # Get Agent-specific configuration
         self.agent_config = config.get("agents", {}).get(agent_name, {})
@@ -128,6 +130,7 @@ class BaseAgent(ABC):
             "api_key": self.api_key,
             "base_url": self.base_url,
             "temperature": temperature,
+            "timeout": self.timeout,
         }
 
         if max_tokens:

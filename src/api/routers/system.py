@@ -138,6 +138,7 @@ async def test_llm_connection():
         llm_config = get_llm_config()
         model = llm_config["model"]
         base_url = llm_config["base_url"].rstrip("/")
+        timeout = llm_config.get("timeout", 600)  # Get timeout from config
 
         # Sanitize Base URL (remove /chat/completions suffix if present)
         for suffix in ["/chat/completions", "/completions"]:
@@ -159,6 +160,7 @@ async def test_llm_connection():
             api_key=api_key,
             base_url=base_url,
             temperature=0.1,
+            timeout=timeout,  # Pass timeout to LLM call
             **token_kwargs,  # Use appropriate token param for model
         )
 

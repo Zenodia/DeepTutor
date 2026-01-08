@@ -1,24 +1,32 @@
 // API configuration and utility functions
 
+// Declare process.env for Next.js environment variables
+declare const process: {
+  env: {
+    NEXT_PUBLIC_API_BASE?: string;
+  };
+};
+
 // Get API base URL from environment variable
 // This is automatically set by start_web.py based on config/main.yaml
 // The .env.local file is auto-generated on startup with the correct backend port
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE ||
   (() => {
+    // In Docker/production, fall back to same-origin with port 8001
     if (typeof window !== "undefined") {
-      console.error("NEXT_PUBLIC_API_BASE is not set.");
-      console.error(
-        "Please configure server ports in config/main.yaml and restart the application using: python scripts/start_web.py",
-      );
-      console.error(
-        "The .env.local file will be automatically generated with the correct backend port.",
-      );
+      // Browser environment - construct from current location
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const backendPort = 8001; // Default backend port
+      const fallbackUrl = `${protocol}//${hostname}:${backendPort}`;
+      console.warn(`NEXT_PUBLIC_API_BASE not set, using fallback: ${fallbackUrl}`);
+      return fallbackUrl;
     }
-    // No fallback - port must be configured in config/main.yaml
-    throw new Error(
-      "NEXT_PUBLIC_API_BASE is not configured. Please set server ports in config/main.yaml and restart.",
-    );
+    // Server-side rendering - use localhost:8001
+    const fallbackUrl = "http://localhost:8001";
+    console.warn(`NEXT_PUBLIC_API_BASE not set, using fallback: ${fallbackUrl}`);
+    return fallbackUrl;
   })();
 
 /**

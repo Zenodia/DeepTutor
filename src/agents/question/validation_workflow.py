@@ -57,7 +57,15 @@ class QuestionValidationWorkflow:
         if model is None:
             model = os.getenv("LLM_MODEL", "gpt-4o")
 
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        # Get timeout from environment (default to 600 seconds for NVIDIA API)
+        timeout = int(os.getenv("LLM_TIMEOUT", "600"))
+        
+        self.client = AsyncOpenAI(
+            api_key=api_key, 
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=3
+        )
         self.api_key = api_key
         self.base_url = base_url
         self.model = model

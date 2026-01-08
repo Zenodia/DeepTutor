@@ -32,15 +32,21 @@ services:
       - "${FRONTEND_PORT:-3782}:${FRONTEND_PORT:-3782}"
 
     # Load environment variables from .env file
+    # The system automatically detects and configures LLM providers from these variables
+    # Supported providers: NVIDIA API, OpenAI, Azure OpenAI, Ollama, LM Studio, etc.
+    # See DOCKER_USAGE.md for configuration examples
     env_file:
       - .env
 
     environment:
       # LLM Configuration (Required)
+      # These variables are automatically detected at startup to create/activate the LLM provider
+      # Priority: 1. Existing active provider, 2. Environment variables
       - LLM_BINDING=${LLM_BINDING:-openai}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_BINDING_API_KEY=${LLM_BINDING_API_KEY}
       - LLM_BINDING_HOST=${LLM_BINDING_HOST}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-300}
       - DISABLE_SSL_VERIFY=${DISABLE_SSL_VERIFY:-false}
       # Embedding Configuration (Required for Knowledge Base)
       - EMBEDDING_BINDING=${EMBEDDING_BINDING:-openai}

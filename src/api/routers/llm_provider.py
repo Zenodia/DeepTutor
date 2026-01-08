@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
@@ -83,6 +84,9 @@ async def test_connection(request: TestConnectionRequest):
         else:
             api_key_to_use = request.api_key
 
+        # Get timeout from environment (default to 600 seconds)
+        timeout = int(os.getenv("LLM_TIMEOUT", "600"))
+
         response = await openai_complete_if_cache(
             model=request.model,
             prompt="Hello, are you working?",
@@ -90,6 +94,7 @@ async def test_connection(request: TestConnectionRequest):
             api_key=api_key_to_use,
             base_url=base_url,
             max_tokens=10,
+            timeout=timeout,
         )
         return {"success": True, "message": "Connection successful", "response": response}
     except Exception as e:

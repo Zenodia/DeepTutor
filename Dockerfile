@@ -126,8 +126,18 @@ COPY --from=python-base /usr/local/bin /usr/local/bin
 # Copy built frontend from frontend-builder stage
 COPY --from=frontend-builder /app/web/.next ./web/.next
 COPY --from=frontend-builder /app/web/public ./web/public
+COPY --from=frontend-builder /app/web/app ./web/app
+COPY --from=frontend-builder /app/web/components ./web/components
+COPY --from=frontend-builder /app/web/context ./web/context
+COPY --from=frontend-builder /app/web/hooks ./web/hooks
+COPY --from=frontend-builder /app/web/lib ./web/lib
+COPY --from=frontend-builder /app/web/types ./web/types
 COPY --from=frontend-builder /app/web/package.json ./web/package.json
 COPY --from=frontend-builder /app/web/next.config.js ./web/next.config.js
+COPY --from=frontend-builder /app/web/tsconfig.json ./web/tsconfig.json
+COPY --from=frontend-builder /app/web/next-env.d.ts ./web/next-env.d.ts
+COPY --from=frontend-builder /app/web/postcss.config.js ./web/postcss.config.js
+COPY --from=frontend-builder /app/web/tailwind.config.js ./web/tailwind.config.js
 COPY --from=frontend-builder /app/web/node_modules ./web/node_modules
 
 # Copy application source code
@@ -223,14 +233,30 @@ fi
 
 echo "[Frontend] 🚀 Starting Next.js frontend on port ${FRONTEND_PORT}..."
 echo "[Frontend] 📌 API base URL: ${API_BASE}"
+echo "[Frontend] 🔧 Replacing API_BASE placeholder in built files..."
 
 # Replace placeholder in built Next.js files
 # This is necessary because NEXT_PUBLIC_* vars are inlined at build time
-find /app/web/.next -type f \( -name "*.js" -o -name "*.json" \) -exec \
-    sed -i "s|__NEXT_PUBLIC_API_BASE_PLACEHOLDER__|${API_BASE}|g" {} \; 2>/dev/null || true
+# Use a more robust approach with better error handling
+REPLACED_COUNT=0
+if [ -d "/app/web/.next" ]; then
+    while IFS= read -r -d '' file; do
+        if grep -q "__NEXT_PUBLIC_API_BASE_PLACEHOLDER__" "$file" 2>/dev/null; then
+            sed -i "s|__NEXT_PUBLIC_API_BASE_PLACEHOLDER__|${API_BASE}|g" "$file"
+            REPLACED_COUNT=$((REPLACED_COUNT + 1))
+        fi
+    done < <(find /app/web/.next -type f \( -name "*.js" -o -name "*.json" \) -print0)
+    echo "[Frontend] ✅ Replaced placeholder in $REPLACED_COUNT files"
+else
+    echo "[Frontend] ⚠️  Warning: .next directory not found"
+fi
 
 # Also update .env.local for any runtime reads
 echo "NEXT_PUBLIC_API_BASE=${API_BASE}" > /app/web/.env.local
+echo "[Frontend] ✅ Created .env.local with NEXT_PUBLIC_API_BASE=${API_BASE}"
+
+# Export as environment variable (won't work for inlined vars, but useful for debugging)
+export NEXT_PUBLIC_API_BASE="${API_BASE}"
 
 # Start Next.js
 cd /app/web && exec node node_modules/next/dist/bin/next start -H 0.0.0.0 -p ${FRONTEND_PORT}
@@ -265,6 +291,14 @@ if [ -z "$LLM_MODEL" ]; then
     echo "   Please configure LLM_MODEL in your .env file"
 fi
 
+# Set default timeout if not provided (increased to 600 for NVIDIA API)
+if [ -z "$LLM_TIMEOUT" ]; then
+    export LLM_TIMEOUT=600
+    echo "📝 LLM_TIMEOUT not set, using default: 600 seconds"
+else
+    echo "📝 LLM_TIMEOUT: ${LLM_TIMEOUT} seconds"
+fi
+
 # Initialize user data directories if empty
 echo "📁 Checking data directories..."
 if [ ! -f "/app/data/user/user_history.json" ]; then
@@ -275,6 +309,10 @@ from src.core.setup import init_user_directories
 init_user_directories(Path('/app'))
 " 2>/dev/null || echo "   ⚠️ Directory initialization skipped (will be created on first use)"
 fi
+
+# Initialize LLM provider from environment variables
+echo "🔧 Initializing LLM provider..."
+python /app/scripts/init_llm_provider.py
 
 echo "============================================"
 echo "📦 Configuration loaded from:"
