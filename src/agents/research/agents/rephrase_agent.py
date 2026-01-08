@@ -139,6 +139,21 @@ class RephraseAgent(BaseAgent):
                         break
             result = {"topic": fallback_topic}
 
+        # Normalize topic to string if it's a dict
+        # LLM sometimes returns nested structure like {"Research Topic": "...", "Research Focus": {...}}
+        topic_value = result.get("topic")
+        if isinstance(topic_value, dict):
+            # Try to extract the actual topic string from common keys
+            if "Research Topic" in topic_value:
+                result["topic"] = topic_value["Research Topic"]
+            elif "title" in topic_value:
+                result["topic"] = topic_value["title"]
+            elif "topic" in topic_value:
+                result["topic"] = topic_value["topic"]
+            else:
+                # Fallback: stringify the whole dict or use user input
+                result["topic"] = str(topic_value) if topic_value else user_input
+
         result["iteration"] = iteration
 
         # Add assistant response to history

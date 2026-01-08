@@ -225,38 +225,47 @@ BACKEND_PORT=${BACKEND_PORT:-8001}
 FRONTEND_PORT=${FRONTEND_PORT:-3782}
 
 # Determine the API base URL
+# Note: In Docker, when accessing from browser, the browser will use window.location.hostname
+# So we intentionally set a placeholder here that will be caught by the fallback logic
 if [ -n "$NEXT_PUBLIC_API_BASE_EXTERNAL" ]; then
     API_BASE="$NEXT_PUBLIC_API_BASE_EXTERNAL"
 else
-    API_BASE="http://localhost:${BACKEND_PORT}"
+    # Use a special marker that tells the frontend to use client-side fallback
+    # This allows the browser to construct the correct URL based on its location
+    API_BASE="__USE_CLIENT_FALLBACK__"
 fi
 
 echo "[Frontend] 🚀 Starting Next.js frontend on port ${FRONTEND_PORT}..."
-echo "[Frontend] 📌 API base URL: ${API_BASE}"
-echo "[Frontend] 🔧 Replacing API_BASE placeholder in built files..."
+echo "[Frontend] 📌 Backend port: ${BACKEND_PORT}"
 
-# Replace placeholder in built Next.js files
-# This is necessary because NEXT_PUBLIC_* vars are inlined at build time
-# Use a more robust approach with better error handling
-REPLACED_COUNT=0
-if [ -d "/app/web/.next" ]; then
-    while IFS= read -r -d '' file; do
-        if grep -q "__NEXT_PUBLIC_API_BASE_PLACEHOLDER__" "$file" 2>/dev/null; then
-            sed -i "s|__NEXT_PUBLIC_API_BASE_PLACEHOLDER__|${API_BASE}|g" "$file"
-            REPLACED_COUNT=$((REPLACED_COUNT + 1))
-        fi
-    done < <(find /app/web/.next -type f \( -name "*.js" -o -name "*.json" \) -print0)
-    echo "[Frontend] ✅ Replaced placeholder in $REPLACED_COUNT files"
+# Only replace placeholder if we have a real URL (not using client fallback)
+if [ "$API_BASE" != "__USE_CLIENT_FALLBACK__" ]; then
+    echo "[Frontend] 📌 API base URL: ${API_BASE}"
+    echo "[Frontend] 🔧 Replacing API_BASE placeholder in built files..."
+    
+    # Replace placeholder in built Next.js files
+    REPLACED_COUNT=0
+    if [ -d "/app/web/.next" ]; then
+        while IFS= read -r -d '' file; do
+            if grep -q "__NEXT_PUBLIC_API_BASE_PLACEHOLDER__" "$file" 2>/dev/null; then
+                sed -i "s|__NEXT_PUBLIC_API_BASE_PLACEHOLDER__|${API_BASE}|g" "$file"
+                REPLACED_COUNT=$((REPLACED_COUNT + 1))
+            fi
+        done < <(find /app/web/.next -type f \( -name "*.js" -o -name "*.json" \) -print0)
+        echo "[Frontend] ✅ Replaced placeholder in $REPLACED_COUNT files"
+    else
+        echo "[Frontend] ⚠️  Warning: .next directory not found"
+    fi
+    
+    # Update .env.local
+    echo "NEXT_PUBLIC_API_BASE=${API_BASE}" > /app/web/.env.local
+    echo "[Frontend] ✅ Created .env.local with NEXT_PUBLIC_API_BASE=${API_BASE}"
+    export NEXT_PUBLIC_API_BASE="${API_BASE}"
 else
-    echo "[Frontend] ⚠️  Warning: .next directory not found"
+    echo "[Frontend] 📌 Using client-side fallback for API URL (will use browser hostname with port ${BACKEND_PORT})"
+    echo "[Frontend] ℹ️  Clients will connect to: <browser-hostname>:${BACKEND_PORT}"
+    # Don't replace the placeholder - let the client-side logic handle it
 fi
-
-# Also update .env.local for any runtime reads
-echo "NEXT_PUBLIC_API_BASE=${API_BASE}" > /app/web/.env.local
-echo "[Frontend] ✅ Created .env.local with NEXT_PUBLIC_API_BASE=${API_BASE}"
-
-# Export as environment variable (won't work for inlined vars, but useful for debugging)
-export NEXT_PUBLIC_API_BASE="${API_BASE}"
 
 # Start Next.js
 cd /app/web && exec node node_modules/next/dist/bin/next start -H 0.0.0.0 -p ${FRONTEND_PORT}

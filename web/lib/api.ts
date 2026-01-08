@@ -10,24 +10,36 @@ declare const process: {
 // Get API base URL from environment variable
 // This is automatically set by start_web.py based on config/main.yaml
 // The .env.local file is auto-generated on startup with the correct backend port
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE ||
-  (() => {
-    // In Docker/production, fall back to same-origin with port 8001
-    if (typeof window !== "undefined") {
-      // Browser environment - construct from current location
-      const protocol = window.location.protocol;
-      const hostname = window.location.hostname;
-      const backendPort = 8001; // Default backend port
-      const fallbackUrl = `${protocol}//${hostname}:${backendPort}`;
-      console.warn(`NEXT_PUBLIC_API_BASE not set, using fallback: ${fallbackUrl}`);
-      return fallbackUrl;
-    }
-    // Server-side rendering - use localhost:8001
-    const fallbackUrl = "http://localhost:8001";
+export const API_BASE_URL = (() => {
+  // Check if we have a valid environment variable
+  const envBase = process.env.NEXT_PUBLIC_API_BASE;
+  
+  // Filter out placeholder values that weren't replaced
+  const isValidEnvBase = envBase && 
+    !envBase.includes("__NEXT_PUBLIC_API_BASE_PLACEHOLDER__") &&
+    !envBase.includes("undefined");
+  
+  if (isValidEnvBase) {
+    return envBase;
+  }
+  
+  // In Docker/production, fall back to same-origin with port 8001
+  if (typeof window !== "undefined") {
+    // Browser environment - construct from current location
+    // This ensures the frontend uses the same hostname the user is accessing
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const backendPort = 8001; // Default backend port
+    const fallbackUrl = `${protocol}//${hostname}:${backendPort}`;
     console.warn(`NEXT_PUBLIC_API_BASE not set, using fallback: ${fallbackUrl}`);
     return fallbackUrl;
-  })();
+  }
+  
+  // Server-side rendering - use localhost:8001
+  const fallbackUrl = "http://localhost:8001";
+  console.warn(`NEXT_PUBLIC_API_BASE not set (SSR), using fallback: ${fallbackUrl}`);
+  return fallbackUrl;
+})();
 
 /**
  * Construct a full API URL from a path

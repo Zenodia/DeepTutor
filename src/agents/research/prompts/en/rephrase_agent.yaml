@@ -6,13 +6,13 @@ system:
 
 process:
   rephrase: |
-    Analyze and optimize the following user input. Only output JSON object:
+    Analyze and optimize the following user input into a clear, focused research topic.
 
     User Input: {user_input}
     Iteration Count: {iteration}
     {previous_result}
 
-    **Optimization Dimensions:**
+    **Think about these dimensions (for internal analysis, DO NOT include in output):**
 
     1. **Research Topic**: Transform into a clear, specific, researchable topic
     2. **Research Focus**: Identify core issues and key elements
@@ -21,15 +21,17 @@ process:
 
     Based on the above considerations, generate a research objective with prominent theme, clear focus, and well-defined scope, with length not exceeding twice the user input.
 
-    Output JSON:
+    **Output Format (CRITICAL - Must be exactly this structure):**
     {{
-        "topic": "A clear, complete research topic description"
+        "topic": "A single clear, complete research topic description as a string"
     }}
 
-    Requirements:
-    1. topic must be coherent text that can independently express complete information
-    2. When iteration = 0, provide reasonable focus and optimization
-    3. When iteration > 0, adjust based on user feedback
+    **Requirements:**
+    1. The "topic" value MUST be a plain string, not a nested object or dict
+    2. The topic must be coherent text that can independently express complete information
+    3. When iteration = 0, provide reasonable focus and optimization
+    4. When iteration > 0, adjust based on user feedback
+    5. DO NOT include Research Focus, Research Scope, or other fields in the JSON output
 
   check_satisfaction: |
     Analyze user feedback on the rephrasing result. Only output JSON object:

@@ -32,8 +32,21 @@ class ManagerAgent(BaseAgent):
         """Set queue to manage"""
         self.queue = queue
 
-    def set_primary_topic(self, topic: str | None) -> None:
+    def set_primary_topic(self, topic: str | dict | None) -> None:
         """Update primary research topic for subsequent topic consistency judgment"""
+        # Handle case where topic might be a dict (from rephrase agent)
+        if isinstance(topic, dict):
+            # Try to extract string from common keys
+            if "Research Topic" in topic:
+                topic = topic["Research Topic"]
+            elif "topic" in topic:
+                topic = topic["topic"]
+            elif "title" in topic:
+                topic = topic["title"]
+            else:
+                # Fallback: stringify the dict
+                topic = str(topic)
+        
         self.primary_topic = (topic or "").strip() or None
 
     def get_next_task(self) -> TopicBlock | None:
