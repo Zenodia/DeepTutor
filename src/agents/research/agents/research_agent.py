@@ -354,11 +354,61 @@ Tools already used: {", ".join(used_tools) if used_tools else "None"}
             user_prompt=user_prompt,
             system_prompt=system_prompt,
             stage="check_sufficiency",
-            verbose=False,
+            verbose=True,  # Enable verbose to see LLM output
         )
         from ..utils.json_utils import ensure_json_dict, ensure_keys
 
+        # Add print statement to ensure it shows in logs
+        print(f"\n[DEBUG] check_sufficiency: LLM returned {len(response)} characters")
+        print(f"[DEBUG] First 200 chars: {response[:200]}")
+
         data = extract_json_from_text(response)
+        
+        # Check if data is valid (must be a dict, not None, not a list, not a string)
+        if not isinstance(data, dict):
+            print(f"\n⚠️ [ERROR] Failed to extract valid JSON dict from LLM response in check_sufficiency")
+            print(f"   Extracted data type: {type(data)}")
+            print(f"   Extracted data value: {data}")
+            print(f"📄 Raw LLM Response (first attempt):\n{response[:1000]}\n")
+            
+            # Retry with explicit JSON formatting request
+            retry_prompt = f"""The previous response was not valid JSON. Please provide ONLY a valid JSON object with the required fields.
+
+Original request:
+{user_prompt}
+
+IMPORTANT:
+- Output ONLY the JSON object, no other text
+- Do not wrap in markdown code blocks
+- Ensure all string values are properly quoted
+- Ensure all keys are in double quotes
+- Do not use trailing commas
+- Output must be a JSON OBJECT {{}}, not an array []
+
+Required JSON format:
+{{
+  "is_sufficient": true,
+  "covered_dimensions": ["dimension1", "dimension2"],
+  "missing_dimensions": ["dimension3"],
+  "coverage_score": 0.8,
+  "reason": "explanation here"
+}}"""
+            
+            response = await self.call_llm(
+                user_prompt=retry_prompt,
+                system_prompt=system_prompt,
+                stage="check_sufficiency_retry",
+                verbose=True,  # Enable verbose to see retry output
+            )
+            
+            data = extract_json_from_text(response)
+            if not isinstance(data, dict):
+                print(f"\n❌ [ERROR] Failed to extract valid JSON dict even after retry (check_sufficiency)")
+                print(f"   Extracted data type: {type(data)}")
+                print(f"   Extracted data value: {data}")
+                print(f"📄 Raw LLM Response (retry attempt):\n{response[:1000]}\n")
+                raise ValueError(f"Expected JSON object but could not extract valid JSON from LLM response after retry. Response preview: {response[:200]}...")
+        
         obj = ensure_json_dict(data)
         ensure_keys(obj, ["is_sufficient", "reason"])
         return obj
@@ -414,11 +464,67 @@ Tools already used: {", ".join(used_tools) if used_tools else "None"}
             user_prompt=user_prompt,
             system_prompt=system_prompt,
             stage="generate_query_plan",
-            verbose=False,
+            verbose=True,  # Enable verbose to see LLM output
         )
         from ..utils.json_utils import ensure_json_dict, ensure_keys
 
+        # Add print statement to ensure it shows in logs
+        print(f"\n[DEBUG] generate_query_plan: LLM returned {len(response)} characters")
+        print(f"[DEBUG] First 200 chars: {response[:200]}")
+
         data = extract_json_from_text(response)
+        
+        # Check if data is valid (must be a dict, not None, not a list, not a string)
+        if not isinstance(data, dict):
+            print(f"\n⚠️ [ERROR] Failed to extract valid JSON dict from LLM response in generate_query_plan")
+            print(f"   Extracted data type: {type(data)}")
+            print(f"   Extracted data value: {data}")
+            print(f"📄 Raw LLM Response (first attempt):\n{response[:1000]}\n")
+            
+            # Retry with explicit JSON formatting request
+            retry_prompt = f"""The previous response was not valid JSON. Please provide ONLY a valid JSON object with the required fields.
+
+Original request:
+{user_prompt}
+
+IMPORTANT: 
+- Output ONLY the JSON object, no other text
+- Do not wrap in markdown code blocks
+- Ensure all string values are properly quoted
+- Ensure all keys are in double quotes
+- Do not use trailing commas
+- Output must be a JSON OBJECT {{}}, not an array []
+
+Required JSON format:
+{{
+  "query": "string",
+  "tool_type": "string",
+  "target_dimension": "string",
+  "rationale": "string",
+  "parallel": false,
+  "fallback": ["rag_hybrid", "rag_naive"],
+  "should_add_new_topic": false,
+  "new_sub_topic": null,
+  "new_overview": null,
+  "new_topic_reason": null,
+  "new_topic_score": 0.0
+}}"""
+            
+            response = await self.call_llm(
+                user_prompt=retry_prompt,
+                system_prompt=system_prompt,
+                stage="generate_query_plan_retry",
+                verbose=True,  # Enable verbose to see retry output
+            )
+            
+            data = extract_json_from_text(response)
+            if not isinstance(data, dict):
+                print(f"\n❌ [ERROR] Failed to extract valid JSON dict even after retry (generate_query_plan)")
+                print(f"   Extracted data type: {type(data)}")
+                print(f"   Extracted data value: {data}")
+                print(f"📄 Raw LLM Response (retry attempt):\n{response[:1000]}\n")
+                raise ValueError(f"Expected JSON object but could not extract valid JSON from LLM response after retry. Response preview: {response[:200]}...")
+        
         obj = ensure_json_dict(data)
         ensure_keys(obj, ["query", "tool_type", "rationale"])
         return obj

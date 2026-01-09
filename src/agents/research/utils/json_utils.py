@@ -22,14 +22,29 @@ def extract_json_from_text(text: str) -> Union[Dict[str, Any], List[Any], None]:
     if not text:
         return None
 
-    # 1) Code block
-    code_block = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
-    if code_block:
-        snippet = code_block.group(1).strip()
-        try:
-            return json.loads(snippet)
-        except json.JSONDecodeError:
-            pass
+    # Strip leading/trailing whitespace
+    text = text.strip()
+    
+    # Fix double curly braces that some LLMs return ({{ }} -> { })
+    # This is a common issue when LLMs try to escape braces in their output
+    text = text.replace('{{', '{').replace('}}', '}')
+
+    # 1) Code block - try multiple patterns
+    code_block_patterns = [
+        r"```json\s*([\s\S]*?)\s*```",  # ```json ... ```
+        r"```\s*([\s\S]*?)\s*```",      # ``` ... ```
+        r"~~~json\s*([\s\S]*?)\s*~~~",  # ~~~json ... ~~~
+        r"~~~\s*([\s\S]*?)\s*~~~",      # ~~~ ... ~~~
+    ]
+    
+    for pattern in code_block_patterns:
+        code_block = re.search(pattern, text)
+        if code_block:
+            snippet = code_block.group(1).strip()
+            try:
+                return json.loads(snippet)
+            except json.JSONDecodeError:
+                pass
 
     # 2) Parse entire text
     try:
@@ -37,7 +52,16 @@ def extract_json_from_text(text: str) -> Union[Dict[str, Any], List[Any], None]:
     except json.JSONDecodeError:
         pass
 
-    # 3) Fragment parsing
+    # 3) Fragment parsing - use greedy matching for nested structures
+    # Try to find the outermost JSON object
+    obj_match = re.search(r"\{(?:[^{}]|(?:\{[^{}]*\}))*\}", text)
+    if obj_match:
+        try:
+            return json.loads(obj_match.group(0))
+        except json.JSONDecodeError:
+            pass
+    
+    # Fallback to simpler greedy match for deeply nested objects
     obj_match = re.search(r"\{[\s\S]*\}", text)
     if obj_match:
         try:
@@ -45,6 +69,7 @@ def extract_json_from_text(text: str) -> Union[Dict[str, Any], List[Any], None]:
         except json.JSONDecodeError:
             pass
 
+    # Try to find JSON array
     arr_match = re.search(r"\[[\s\S]*\]", text)
     if arr_match:
         try:
